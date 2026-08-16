@@ -1,0 +1,64 @@
+[package]
+edition      = "2024"
+name         = "hallvardns"
+rust-version = "1.88"
+version      = "0.1.0"
+
+[[bin]]
+name = "hallvardns"
+path = "./src/bin/main.rs"
+
+[dependencies]
+# ESP HAL & RTOS - stripped defmt features
+esp-hal = { version = "~1.1.0", features = ["esp32", "unstable"] }
+esp-rtos = { version = "0.3.0", features = [
+  "embassy",
+  "esp-alloc",
+  "esp-radio",
+  "esp32",
+] }
+esp-bootloader-esp-idf = { version = "0.5.0", features = ["esp32"] }
+
+# Embassy Async Framework
+embassy-net = { version = "0.9.1", default-features = false, features = ["proto-ipv4", "medium-ethernet", "udp", "dhcpv4"] }
+embassy-executor = { version = "0.10.0" }
+embassy-time = { version = "0.5.0" }
+
+# Networking & Allocation
+esp-alloc = { version = "0.10.0" }
+esp-radio = { version = "0.18.0", features = [
+  "esp-alloc",
+  "esp32",
+  "unstable",
+  "wifi",
+] }
+smoltcp = { version = "0.13.0", default-features = false, features = [
+  "medium-ethernet",
+  "multicast",
+  "proto-dhcpv4",
+  "proto-dns",
+  "proto-ipv4",
+  "socket-dns",
+  "socket-icmp",
+  "socket-raw",
+  "socket-tcp",
+  "socket-udp",
+  "dns-max-server-count-4",
+] }
+
+# Utilities
+critical-section = "1.2.0"
+static_cell      = "2.1.1"
+
+[build-dependencies]
+reqwest = { version = "0.12", features = ["blocking"] }
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+codegen-units = 1
+debug         = 0         # Strips symbol tables from binary
+lto           = 'fat'
+opt-level     = 's'
+panic         = 'abort'   # Removes stack unwinding and panic formatting overhead
