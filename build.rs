@@ -4,50 +4,6 @@ fn main() {
     // println!("cargo:rustc-link-arg=-Tdefmt.x");
     // make sure linkall.x is the last linker script (otherwise might cause problems with flip-link)
     println!("cargo:rustc-link-arg=-Tlinkall.x");
-
-    // Generate blocklist.
-    //
-    // use std::collections::BTreeSet;
-    // use std::env;
-    // use std::fs::File;
-    // use std::io::{BufWriter, Write};
-    // use std::path::Path;
-    //
-    // println!("cargo:rerun-if-changed=build.rs");
-    //
-    // let out_file = env::var("BLOCKLIST").unwrap();
-    // let dest_path = Path::new(&out_file);
-    // let mut writer = BufWriter::new(File::create(dest_path).unwrap());
-    //
-    // // 1. Fetch blocklist at build time
-    // let url = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts";
-    // let body = reqwest::blocking::get(url)
-    //     .expect("Failed to fetch blocklist")
-    //     .text()
-    //     .expect("Failed to read blocklist body");
-    //
-    // // 2. Parse, filter, deduplicate, and sort entries
-    // let mut domains = BTreeSet::new();
-    // for line in body.lines() {
-    //     let line = line.trim();
-    //     if line.starts_with('#') || line.is_empty() {
-    //         continue;
-    //     }
-    //     let parts: Vec<&str> = line.split_whitespace().collect();
-    //     if parts.len() >= 2 {
-    //         let domain = parts[1].to_lowercase();
-    //         if domain != "localhost" && domain != "broadcasthost" {
-    //             domains.insert(domain);
-    //         }
-    //     }
-    // }
-    //
-    // // 3. Emit a pre-sorted static array into blocklist
-    // writeln!(writer, "pub static BLOCKED: [&str; {}] = [", domains.len()).unwrap();
-    // for domain in &domains {
-    //     writeln!(writer, "    \"{}\",", domain).unwrap();
-    // }
-    // writeln!(writer, "];").unwrap();
 }
 
 fn linker_be_nice() {
