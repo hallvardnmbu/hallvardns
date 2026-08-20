@@ -21,13 +21,15 @@ pub fn config() -> Config {
     )
 }
 
+/// Connect to the WiFi, and reconnect on disconnects.
 #[embassy_executor::task]
-pub async fn connection(mut controller: WifiController<'static>) {
+pub async fn connect(mut controller: WifiController<'static>) {
     loop {
         if !controller.is_connected() {
             let _ = controller.connect_async().await;
         }
 
+        // Re-enter loop (and try to reconnect) on disconnect.
         if controller.is_connected() {
             let _ = controller.wait_for_disconnect_async().await;
         }
@@ -36,7 +38,8 @@ pub async fn connection(mut controller: WifiController<'static>) {
     }
 }
 
+/// Set up the networking stack.
 #[embassy_executor::task]
-pub async fn net_task(mut runner: Runner<'static, Interface<'static>>) {
+pub async fn network(mut runner: Runner<'static, Interface<'static>>) {
     runner.run().await;
 }

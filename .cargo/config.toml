@@ -2,7 +2,8 @@
 runner = "espflash flash --monitor --chip esp32"
 
 [env]
-BLOCKLIST = "blocklist.rs"
+SSID = "Internet"
+PASSWORD = "Password"
 
 [build]
 rustflags = [

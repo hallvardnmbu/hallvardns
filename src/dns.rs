@@ -5,36 +5,38 @@ use embassy_net::{
 
 const UPSTREAM: Ipv4Address = Ipv4Address::new(1, 1, 1, 1);
 
-const BLOCKED: &[&str] = &[
-    "blocked.com",
-];
-
 const LOCAL: &[(&str, [u8; 4])] = &[
     ("server.lan", [192, 168, 86, 89]),
 ];
 
-pub async fn run(stack: Stack<'static>) {
+// Local logging via UDP.
+const LOGGER_IP: Ipv4Address = Ipv4Address::new(192, 168, 86, 130);
+const LOGGER_PORT: u16 = 5514;
+
+/// DNS server.
+pub async fn serve(stack: Stack<'static>) {
     let mut rx_meta = [PacketMetadata::EMPTY; 4];
     let mut tx_meta = [PacketMetadata::EMPTY; 4];
     let mut rx = [0u8; 1232];
     let mut tx = [0u8; 1232];
-
-    let mut socket =
-        UdpSocket::new(stack, &mut rx_meta, &mut rx, &mut tx_meta, &mut tx);
-
+    let mut socket = UdpSocket::new(stack, &mut rx_meta, &mut rx, &mut tx_meta, &mut tx);
     socket.bind(53).unwrap();
 
     let mut up_rx_meta = [PacketMetadata::EMPTY; 4];
     let mut up_tx_meta = [PacketMetadata::EMPTY; 4];
     let mut up_rx = [0u8; 1232];
     let mut up_tx = [0u8; 1232];
-
-    let mut upstream =
-        UdpSocket::new(stack, &mut up_rx_meta, &mut up_rx, &mut up_tx_meta, &mut up_tx);
-
+    let mut upstream = UdpSocket::new(stack, &mut up_rx_meta, &mut up_rx, &mut up_tx_meta, &mut up_tx);
     upstream.bind(0).unwrap();
-
     let upstream_endpoint = IpEndpoint::new(UPSTREAM.into(), 53);
+
+    let mut log_rx_meta = [PacketMetadata::EMPTY; 1];
+    let mut log_tx_meta = [PacketMetadata::EMPTY; 1];
+    let mut log_rx = [0u8; 1];
+    let mut log_tx = [0u8; 253]; // Max DNS name length.
+    let mut logger = UdpSocket::new(stack, &mut log_rx_meta, &mut log_rx, &mut log_tx_meta, &mut log_tx);
+    logger.bind(0).unwrap();
+    let logger_endpoint = IpEndpoint::new(LOGGER_IP.into(), LOGGER_PORT);
 
     let mut buf = [0u8; 1232];
 
@@ -52,17 +54,17 @@ pub async fn run(stack: Stack<'static>) {
 
         esp_println::println!("can you dig {:?} ?", name);
 
+        // Log the queried name via UDP.
+        let _ = logger.send_to(name.as_bytes(), logger_endpoint).await;
+
+
+        if query.qtype != 1 {
+            continue; // not an A query — nothing more to do
+        }
+
         if let Some(addr) = local(name) {
             if let Some(len) = answer(&mut buf, query.end, Some(addr)) {
                 esp_println::println!(" of course, issa local");
-                let _ = socket.send_to(&buf[..len], remote.endpoint).await;
-            }
-            continue;
-        }
-
-        if blocked(name) {
-            if let Some(len) = answer(&mut buf, query.end, None) {
-                 esp_println::println!(" NO!");
                 let _ = socket.send_to(&buf[..len], remote.endpoint).await;
             }
             continue;
@@ -80,6 +82,7 @@ struct Query {
     name: [u8; 253],
     len: usize,
     end: usize,
+    qtype: u16,
 }
 
 impl Query {
@@ -134,8 +137,9 @@ fn parse(packet: &[u8]) -> Option<Query> {
         pos += label_len;
     }
 
-    // Must be QTYPE = A (1) and QCLASS = IN (1)
-    if packet.get(pos..pos + 4)? != [0, 1, 0, 1] {
+    let qtype = u16::from_be_bytes(packet.get(pos..pos + 2)?.try_into().ok()?);
+    let qclass = u16::from_be_bytes(packet.get(pos + 2..pos + 4)?.try_into().ok()?);
+    if qclass != 1 {
         return None;
     }
 
@@ -143,6 +147,7 @@ fn parse(packet: &[u8]) -> Option<Query> {
         name,
         len,
         end: pos + 4,
+        qtype,
     })
 }
 
@@ -150,24 +155,6 @@ fn local(name: &str) -> Option<[u8; 4]> {
     LOCAL.iter()
         .find(|(domain, _)| *domain == name)
         .map(|(_, addr)| *addr)
-}
-
-fn blocked(name: &str) -> bool {
-    if BLOCKED.binary_search(&name).is_ok() {
-        return true;
-    }
-
-    let mut name = name;
-
-    while let Some((_, rest)) = name.split_once('.') {
-        if BLOCKED.binary_search(&rest).is_ok() {
-            return true;
-        }
-
-        name = rest;
-    }
-
-    false
 }
 
 fn answer(

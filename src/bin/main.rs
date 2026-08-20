@@ -48,7 +48,7 @@ async fn main(spawner: Spawner) {
     )
     .unwrap();
 
-    static RESOURCES: StaticCell<StackResources<3>> = StaticCell::new();
+    static RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
 
     let rng = Rng::new();
     let seed = rng.random() as u64 | ((rng.random() as u64) << 32);
@@ -60,12 +60,10 @@ async fn main(spawner: Spawner) {
         seed,
     );
 
-    spawner.spawn(wifi::connection(controller).unwrap());
-    spawner.spawn(wifi::net_task(runner).unwrap());
+    // Set up the network connection.
+    spawner.spawn(wifi::connect(controller).unwrap());
+    spawner.spawn(wifi::network(runner).unwrap());
+    stack.wait_config_up().await;
 
-    while stack.config_v4().is_none() {
-        embassy_time::Timer::after_secs(1).await;
-    }
-
-    dns::run(stack).await;
+    dns::serve(stack).await;
 }
